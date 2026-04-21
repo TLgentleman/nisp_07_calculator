@@ -1,95 +1,122 @@
 /**
- * Professional Calculator Logic
- * @author Twoje Imię (pod okiem Profesora)
- * @version 1.0.0
+ * Professional Calculator Logic - Wersja z jawnym "+" i "-"
  */
 
-// Pobieramy referencje do kluczowych elementów interfejsu
 const mainScreen = document.getElementById('main-screen');
 const keypad = document.querySelector('.calc-keypad');
 
-// Stan aplikacji (enkapsulacja podstawowych danych)
-let currentInput = '0';
-let shouldResetScreen = false;
+// Nasz stan - trzymamy całe równanie jako tekst (string)
+let equation = ''; 
+let isCalculated = false;
 
-/**
- * Funkcja aktualizująca warstwę prezentacji (UI)
- */
+// --- FUNKCJE POMOCNICZE I WYŚWIETLANIE ---
+
 const updateDisplay = () => {
-    // Formatowanie liczb dla lepszego UX (np. dodawanie odstępów tysięcznych w przyszłości)
-    mainScreen.textContent = currentInput.replace('.', ',');
+    mainScreen.textContent = equation === '' ? '0' : equation.replace(/\./g, ',');
     
-    // Dynamiczne skalowanie czcionki, jeśli liczba jest za długa
-    if (currentInput.length > 7) {
+    if (equation.length > 7) {
         mainScreen.style.fontSize = '3rem';
     } else {
         mainScreen.style.fontSize = '5rem';
     }
 };
 
-/**
- * Obsługa wprowadzania cyfr
- * @param {string} number - Cyfra przekazana z atrybutu data-value
- */
 const appendNumber = (number) => {
-    // Jeśli na ekranie jest '0' lub musimy zresetować ekran po operacji
-    if (currentInput === '0' || shouldResetScreen) {
-        currentInput = number;
-        shouldResetScreen = false;
+    if (isCalculated) {
+        equation = number;
+        isCalculated = false;
     } else {
-        // Ograniczenie do 9 cyfr (standard w iPhone)
-        if (currentInput.length < 9) {
-            currentInput += number;
-        }
+        equation += number;
     }
     updateDisplay();
 };
 
-/**
- * Obsługa kropki/przecinka dziesiętnego
- */
-const appendDecimal = () => {
-    if (shouldResetScreen) {
-        currentInput = '0.';
-        shouldResetScreen = false;
-        updateDisplay();
-        return;
+// --- TWOJE ZMODYFIKOWANE FUNKCJE MATEMATYCZNE ---
+
+const handleAddition = () => {
+    if (isCalculated) isCalculated = false;
+    if (equation === '') equation = '0';
+
+    const lastChar = equation.slice(-1);
+    
+    if (lastChar === '+' || lastChar === '-') {
+        equation = equation.slice(0, -1) + '+';
+    } else {
+        equation += '+';
     }
-    // Zapobiegamy dodaniu więcej niż jednej kropki
-    if (!currentInput.includes('.')) {
-        currentInput += '.';
+    updateDisplay();
+};
+
+const handleSubtraction = () => {
+    if (isCalculated) isCalculated = false;
+    if (equation === '') equation = '0';
+
+    const lastChar = equation.slice(-1);
+    
+    if (lastChar === '+' || lastChar === '-') {
+        equation = equation.slice(0, -1) + '-';
+    } else {
+        equation += '-';
+    }
+    updateDisplay();
+};
+
+const calculateResult = () => {
+    try {
+        const sanitizedEquation = equation.replace(/[^0-9+\-.]/g, '');
+        if (!sanitizedEquation) return;
+
+        const result = new Function('return ' + sanitizedEquation)();
+        
+        equation = String(result);
+        isCalculated = true;
+        updateDisplay();
+    } catch (error) {
+        equation = 'Błąd';
+        isCalculated = true;
         updateDisplay();
     }
 };
 
-/**
- * Główny kontroler zdarzeń (Event Delegation)
- */
+// --- GŁÓWNY KONTROLER ZDARZEŃ (EVENT DELEGATION) ---
+
 keypad.addEventListener('click', (event) => {
     const target = event.target;
-
-    // Sprawdzamy, czy kliknięty element to na pewno przycisk
     if (!target.classList.contains('btn')) return;
 
-    // Wyciągamy dane z atrybutów data-* które przygotowaliśmy w HTML
-    const { value, action } = target.dataset;
+    // Pobieramy atrybuty data-* przypisane do klikniętego przycisku w HTML
+    const { value, operator, action } = target.dataset;
 
-    // Logika wyboru akcji
+    // 1. Obsługa liczb i kropki
     if (value) {
         if (value === 'dot') {
-            appendDecimal();
+            if (isCalculated) { equation = '0.'; isCalculated = false; }
+            else { equation += '.'; }
+            updateDisplay();
         } else {
             appendNumber(value);
         }
     }
 
-    if (action === 'clear') {
-        currentInput = '0';
-        updateDisplay();
+    // 2. Obsługa operatorów (TUTAJ PODPIĘTE SĄ NOWE FUNKCJE)
+    if (operator === 'add') {
+        handleAddition();
+    } 
+    else if (operator === 'subtract') {
+        handleSubtraction();
     }
 
-    // Tutaj w przyszłości dodamy obsługę 'negate', 'percent' oraz 'calculate'
+    // 3. Obsługa akcji (= oraz AC)
+    if (action === 'calculate') {
+        calculateResult();
+    }
+    
+    if (action === 'clear') {
+        equation = '';
+        isCalculated = false;
+        updateDisplay();
+    }
 });
 
-// Inicjalizacja wyświetlacza
+// Inicjalizacja ekranu po załadowaniu
 updateDisplay();
