@@ -12,13 +12,41 @@ let isCalculated = false;
 // --- FUNKCJE POMOCNICZE I WYŚWIETLANIE ---
 
 const updateDisplay = () => {
-    mainScreen.textContent = equation === '' ? '0' : equation.replace(/\./g, ',');
+    // Wizualna podmiana operatorów na te "ładniejsze" dla użytkownika
+    let displayValue = equation === '' ? '0' : equation;
+    displayValue = displayValue
+        .replace(/\*/g, ' × ')
+        .replace(/\//g, ' ÷ ')
+        .replace(/\+/g, ' + ')
+        .replace(/\-/g, ' − ')
+        .replace(/\./g, ',');
     
-    if (equation.length > 7) {
-        mainScreen.style.fontSize = '3rem';
+    mainScreen.textContent = displayValue;
+    
+    // Dynamiczne skalowanie czcionki dla dłuższych równań
+    if (displayValue.length > 10) {
+        mainScreen.style.fontSize = '2.5rem';
+    } else if (displayValue.length > 6) {
+        mainScreen.style.fontSize = '3.5rem';
     } else {
         mainScreen.style.fontSize = '5rem';
     }
+};
+
+const handleOperator = (op) => {
+    if (isCalculated) isCalculated = false;
+    if (equation === '') equation = '0';
+
+    const lastChar = equation.slice(-1);
+    // Dodane mnożenie (*) i dzielenie (/) do listy sprawdzanych operatorów
+    const operators = ['+', '-', '*', '/'];
+
+    if (operators.includes(lastChar)) {
+        equation = equation.slice(0, -1) + op;
+    } else {
+        equation += op;
+    }
+    updateDisplay();
 };
 
 const appendNumber = (number) => {
@@ -63,15 +91,23 @@ const handleSubtraction = () => {
 
 const calculateResult = () => {
     try {
-        const sanitizedEquation = equation.replace(/[^0-9+\-.]/g, '');
-        if (!sanitizedEquation) return;
+        if (!equation) return;
 
-        const result = new Function('return ' + sanitizedEquation)();
+        // Dodane \* i \/ do dozwolonych znaków
+        const sanitized = equation.replace(/[^0-9+\-*/.]/g, '');
+        const result = new Function('return ' + sanitized)();
+
+        // Zabezpieczenie przed dzieleniem przez zero (Infinity)
+        if (!isFinite(result)) {
+            equation = 'Błąd';
+        } else {
+            // Zaokrąglenie do 8 miejsc po przecinku (precyzja Apple)
+            equation = String(Number(Math.round(result + 'e8') + 'e-8'));
+        }
         
-        equation = String(result);
         isCalculated = true;
         updateDisplay();
-    } catch (error) {
+    } catch (e) {
         equation = 'Błąd';
         isCalculated = true;
         updateDisplay();
@@ -90,20 +126,20 @@ keypad.addEventListener('click', (event) => {
     // 1. Obsługa liczb i kropki
     if (value) {
         if (value === 'dot') {
-            if (isCalculated) { equation = '0.'; isCalculated = false; }
-            else { equation += '.'; }
-            updateDisplay();
+        // Sprawdzamy tylko OSTATNIĄ liczbę w równaniu po rozdzieleniu operatorami
+        if (!equation.split(/[\+\-\*\/]/).pop().includes('.')) {
+            equation += '.';
+        }
+    
         } else {
             appendNumber(value);
         }
     }
 
     // 2. Obsługa operatorów (TUTAJ PODPIĘTE SĄ NOWE FUNKCJE)
-    if (operator === 'add') {
-        handleAddition();
-    } 
-    else if (operator === 'subtract') {
-        handleSubtraction();
+if (operator) {
+        const opMap = { 'add': '+', 'subtract': '-', 'multiply': '*', 'divide': '/' };
+        handleOperator(opMap[operator]);
     }
 
     // 3. Obsługa akcji (= oraz AC)
@@ -120,3 +156,4 @@ keypad.addEventListener('click', (event) => {
 
 // Inicjalizacja ekranu po załadowaniu
 updateDisplay();
+
